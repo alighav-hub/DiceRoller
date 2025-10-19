@@ -53,6 +53,7 @@
         </button>
 
         <!-- Dynamic Dice Display Container -->
+        <!-- Added min-h-[4rem] to prevent layout shift -->
         <div id="dice-rolls-display" class="flex flex-wrap justify-center items-center gap-4 mt-8 min-h-[4rem] p-2">
             <!-- Dice visuals will be injected here by JavaScript -->
         </div>
@@ -122,6 +123,7 @@
             
             for (let i = 1; i <= 9; i++) {
                 const dotWrapper = document.createElement('div');
+                // Positioning dots for different roll values (e.g., top-left, center, bottom-right)
                 dotWrapper.className = 'flex items-center justify-center';
                 
                 const dot = document.createElement('div');
@@ -140,8 +142,8 @@
 
         /**
          * Creates a visual representation for any die by displaying the number.
-         * Used for dN where N > 6 or during the rolling animation.
-         * @param {number} value - The roll result.
+         * Used for dN where N > 6 or during the rolling animation (showing '?').
+         * @param {number|string} value - The roll result or '?' for placeholder.
          * @returns {HTMLElement} The complete dice div with the number inside.
          */
         function createDNVisual(value) {
@@ -149,7 +151,8 @@
             diceDiv.className = 'w-16 h-16 bg-white border-4 border-gray-300 rounded-lg shadow-lg flex items-center justify-center flex-shrink-0 transition-transform duration-300';
             
             const textNode = document.createElement('p');
-            textNode.className = 'text-2xl font-bold text-red-600';
+            // Use different text sizes based on value length (e.g., d20 needs smaller text than d4)
+            textNode.className = value === '?' ? 'text-3xl font-bold text-gray-400' : 'text-2xl font-bold text-red-600';
             textNode.textContent = value;
             
             diceDiv.appendChild(textNode);
@@ -158,7 +161,7 @@
         
         /**
          * Clears existing dice visuals and generates new ones based on a set of rolls.
-         * @param {Array<number>} rolls - Array of individual roll results.
+         * @param {Array<number|string>} rolls - Array of individual roll results (or '?' for placeholders).
          * @param {number} numSides - The maximum number of sides of the dice.
          * @param {boolean} animate - Whether to apply the rolling animation class.
          */
@@ -167,18 +170,22 @@
             
             rolls.forEach(roll => {
                 let dieElement;
-                if (numSides === 6 && roll >= 1 && roll <= 6) {
-                    // Use dot visual for D6 rolls
+                
+                // Use dot visual only if: 
+                // 1. It's a final result (not '?')
+                // 2. The die is a D6 (numSides === 6)
+                // 3. The roll result is between 1 and 6
+                if (roll !== '?' && numSides === 6 && roll >= 1 && roll <= 6) {
                     dieElement = createD6Visual(roll);
                 } else {
-                    // Use number visual for D > 6 or during animation (showing random numbers)
+                    // Use number visual for D > 6, or during the animation phase ('?')
                     dieElement = createDNVisual(roll);
                 }
                 
+                // Apply the animation class if requested
                 if (animate) {
                     dieElement.classList.add('rolling');
                 } else {
-                    // Remove animation class after roll is final
                     dieElement.classList.remove('rolling');
                 }
                 diceRollsDisplay.appendChild(dieElement);
@@ -197,43 +204,30 @@
             if (diceCount > 5) diceCount = 5;
             if (diceCount < 1) diceCount = 1;
             
-            // Disable button during roll animation
+            // Disable button during roll
             rollButton.disabled = true;
             rollButton.textContent = "Rolling...";
 
+            // 1. Core Rolling Logic (Calculated first, before any timing delays)
             let totalRollResult = 0;
             const individualRolls = [];
-
-            // Core Rolling Logic
             for (let i = 0; i < diceCount; i++) {
                 const roll = Math.floor(Math.random() * numSides) + 1;
                 individualRolls.push(roll);
                 totalRollResult += roll;
             }
 
+            // 2. Start Animation State (Display '?' placeholders and start CSS animation)
+            const placeholderRolls = Array.from({length: diceCount}, () => '?');
+            updateDiceVisuals(placeholderRolls, numSides, true);
+
             resultDisplay.textContent = '?';
             resultDisplay.classList.remove('opacity-100');
             detailsDisplay.textContent = "";
 
-            // Show a quick sequence of random numbers for animation effect
-            let intervalCount = 0;
-            const rollEffectInterval = setInterval(() => {
-                const tempRolls = [];
-                for(let i = 0; i < diceCount; i++) {
-                    // Show a random number up to maxSides for the animation
-                    tempRolls.push(Math.floor(Math.random() * numSides) + 1);
-                }
-                updateDiceVisuals(tempRolls, numSides, true);
-                
-                intervalCount++;
-                if (intervalCount > 5) { // Stop the random flashing quickly
-                    clearInterval(rollEffectInterval);
-                }
-            }, 50);
-
-            // Update the final result after animation duration
+            // 3. Final Result State (Display final calculated numbers after animation)
             setTimeout(() => {
-                // Display the final, calculated visuals
+                // Display the final, calculated visuals (d6 dots or number)
                 updateDiceVisuals(individualRolls, numSides, false);
 
                 // Display the calculated SUM
@@ -246,7 +240,7 @@
                 // Re-enable button
                 rollButton.disabled = false;
                 rollButton.textContent = "Roll the Dice!";
-            }, 300); 
+            }, 300); // 300ms matches the CSS animation duration
         }
 
         // Initialize with one die showing 1 on load

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Dice Roller</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for the dice dots */
+        .dice-dot-inner {
+            width: 0.5rem; /* Adjusted for smaller, numerous dice */
+            height: 0.5rem;
+            background-color: #ef4444; /* Tailwind red-500 */
+            border-radius: 50%;
+            transition: opacity 0.1s ease-in-out;
+            opacity: 1; /* Default to visible for the dot generator */
+        }
+        /* Custom Keyframe for the rolling animation */
+        @keyframes diceRoll {
+            0% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.1) rotate(30deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+
+        .rolling {
+            animation: diceRoll 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4" style="font-family: 'Inter', sans-serif;">
+
+    <div class="w-full max-w-lg bg-white p-8 rounded-xl shadow-2xl flex flex-col items-center">
+
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">Dynamic Dice Roller</h1>
+
+        <!-- Input Controls for Dice Count and Faces -->
+        <div class="flex flex-col md:flex-row gap-4 mt-4 w-full">
+            <div class="flex-1">
+                <label for="dice-count-input" class="text-sm font-medium text-gray-700 block mb-1">Number of Dice (Max 5)</label>
+                <input type="number" id="dice-count-input" value="1" min="1" max="5" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-center">
+            </div>
+            <div class="flex-1">
+                <label for="sides-input" class="text-sm font-medium text-gray-700 block mb-1">Number of Sides (d<span id="sides-label">6</span>)</label>
+                <input type="number" id="sides-input" value="6" min="2" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-center">
+            </div>
+        </div>
+        
+        <!-- Roll Button -->
+        <button id="roll-button" class="mt-6 px-6 py-3 w-full bg-red-600 text-white font-semibold rounded-lg shadow-lg hover:bg-red-700 transition duration-150 ease-in-out transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-red-300">
+            Roll the Dice!
+        </button>
+
+        <!-- Dynamic Dice Display Container -->
+        <div id="dice-rolls-display" class="flex flex-wrap justify-center items-center gap-4 mt-8 min-h-[4rem] p-2">
+            <!-- Dice visuals will be injected here by JavaScript -->
+        </div>
+
+
+        <!-- Result Display -->
+        <div class="mt-4 text-center w-full border-t pt-4">
+            <p class="text-lg font-medium text-gray-600">Total Sum:</p>
+            <p id="result-display" class="text-6xl font-extrabold text-gray-800 mt-1 transition-opacity duration-300">?</p>
+            <!-- Displays individual rolls for multi-dice configurations -->
+            <p id="details-display" class="text-sm text-gray-500 mt-2 h-4"></p>
+        </div>
+    </div>
+
+    <script>
+        // --- Dice Logic ---
+        const diceRollsDisplay = document.getElementById('dice-rolls-display');
+        const resultDisplay = document.getElementById('result-display');
+        const rollButton = document.getElementById('roll-button');
+        
+        const diceCountInput = document.getElementById('dice-count-input');
+        const sidesInput = document.getElementById('sides-input');
+        const sidesLabel = document.getElementById('sides-label');
+        const detailsDisplay = document.getElementById('details-display');
+
+        // Configuration map for dot visibility on a D6 face (1-indexed grid positions)
+        const dotVisibilityMap = {
+            1: [5],
+            2: [1, 9],
+            3: [1, 5, 9],
+            4: [1, 3, 7, 9],
+            5: [1, 3, 5, 7, 9],
+            6: [1, 3, 4, 6, 7, 9],
+        };
+
+        // Event listener to update the 'dX' label dynamically
+        sidesInput.addEventListener('input', () => {
+            let sides = parseInt(sidesInput.value);
+            // Ensure sides is at least 2 for a valid die
+            if (isNaN(sides) || sides < 2) {
+                sides = 6; 
+            }
+            sidesLabel.textContent = sides;
+        });
+        
+        // Enforce max 5 dice on input change
+        diceCountInput.addEventListener('change', () => {
+            let count = parseInt(diceCountInput.value);
+            if (count > 5) {
+                diceCountInput.value = 5;
+            } else if (count < 1) {
+                diceCountInput.value = 1;
+            }
+        });
+
+        /**
+         * Creates a visual D6 representation (1-6) with dots.
+         * @param {number} value - The roll result (1 to 6).
+         * @returns {HTMLElement} The complete dice div.
+         */
+        function createD6Visual(value) {
+            const diceDiv = document.createElement('div');
+            // Base classes for the die face (square grid)
+            diceDiv.className = 'w-16 h-16 bg-white border-4 border-gray-300 rounded-lg shadow-lg grid grid-cols-3 grid-rows-3 gap-0.5 p-1.5 flex-shrink-0 transition-transform duration-300';
+            
+            const visibleDots = dotVisibilityMap[value] || [];
+            
+            for (let i = 1; i <= 9; i++) {
+                const dotWrapper = document.createElement('div');
+                dotWrapper.className = 'flex items-center justify-center';
+                
+                const dot = document.createElement('div');
+                dot.className = 'dice-dot-inner';
+                
+                // Hide dots based on the visibility map
+                if (!visibleDots.includes(i)) {
+                    dot.style.opacity = 0;
+                }
+                
+                dotWrapper.appendChild(dot);
+                diceDiv.appendChild(dotWrapper);
+            }
+            return diceDiv;
+        }
+
+        /**
+         * Creates a visual representation for any die by displaying the number.
+         * Used for dN where N > 6 or during the rolling animation.
+         * @param {number} value - The roll result.
+         * @returns {HTMLElement} The complete dice div with the number inside.
+         */
+        function createDNVisual(value) {
+            const diceDiv = document.createElement('div');
+            diceDiv.className = 'w-16 h-16 bg-white border-4 border-gray-300 rounded-lg shadow-lg flex items-center justify-center flex-shrink-0 transition-transform duration-300';
+            
+            const textNode = document.createElement('p');
+            textNode.className = 'text-2xl font-bold text-red-600';
+            textNode.textContent = value;
+            
+            diceDiv.appendChild(textNode);
+            return diceDiv;
+        }
+        
+        /**
+         * Clears existing dice visuals and generates new ones based on a set of rolls.
+         * @param {Array<number>} rolls - Array of individual roll results.
+         * @param {number} numSides - The maximum number of sides of the dice.
+         * @param {boolean} animate - Whether to apply the rolling animation class.
+         */
+        function updateDiceVisuals(rolls, numSides, animate = false) {
+            diceRollsDisplay.innerHTML = '';
+            
+            rolls.forEach(roll => {
+                let dieElement;
+                if (numSides === 6 && roll >= 1 && roll <= 6) {
+                    // Use dot visual for D6 rolls
+                    dieElement = createD6Visual(roll);
+                } else {
+                    // Use number visual for D > 6 or during animation (showing random numbers)
+                    dieElement = createDNVisual(roll);
+                }
+                
+                if (animate) {
+                    dieElement.classList.add('rolling');
+                } else {
+                    // Remove animation class after roll is final
+                    dieElement.classList.remove('rolling');
+                }
+                diceRollsDisplay.appendChild(dieElement);
+            });
+        }
+
+
+        /**
+         * Handles the dice rolling process, including animation and result display.
+         */
+        function rollDice() {
+            // Read inputs, enforcing limits
+            let diceCount = parseInt(diceCountInput.value) || 1;
+            const numSides = parseInt(sidesInput.value) || 6;
+            
+            if (diceCount > 5) diceCount = 5;
+            if (diceCount < 1) diceCount = 1;
+            
+            // Disable button during roll animation
+            rollButton.disabled = true;
+            rollButton.textContent = "Rolling...";
+
+            let totalRollResult = 0;
+            const individualRolls = [];
+
+            // Core Rolling Logic
+            for (let i = 0; i < diceCount; i++) {
+                const roll = Math.floor(Math.random() * numSides) + 1;
+                individualRolls.push(roll);
+                totalRollResult += roll;
+            }
+
+            resultDisplay.textContent = '?';
+            resultDisplay.classList.remove('opacity-100');
+            detailsDisplay.textContent = "";
+
+            // Show a quick sequence of random numbers for animation effect
+            let intervalCount = 0;
+            const rollEffectInterval = setInterval(() => {
+                const tempRolls = [];
+                for(let i = 0; i < diceCount; i++) {
+                    // Show a random number up to maxSides for the animation
+                    tempRolls.push(Math.floor(Math.random() * numSides) + 1);
+                }
+                updateDiceVisuals(tempRolls, numSides, true);
+                
+                intervalCount++;
+                if (intervalCount > 5) { // Stop the random flashing quickly
+                    clearInterval(rollEffectInterval);
+                }
+            }, 50);
+
+            // Update the final result after animation duration
+            setTimeout(() => {
+                // Display the final, calculated visuals
+                updateDiceVisuals(individualRolls, numSides, false);
+
+                // Display the calculated SUM
+                resultDisplay.textContent = totalRollResult;
+                resultDisplay.classList.add('opacity-100');
+
+                // Display details
+                detailsDisplay.textContent = `Rolls: [${individualRolls.join(', ')}]`;
+
+                // Re-enable button
+                rollButton.disabled = false;
+                rollButton.textContent = "Roll the Dice!";
+            }, 300); 
+        }
+
+        // Initialize with one die showing 1 on load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateDiceVisuals([1], 6, false);
+            resultDisplay.textContent = '1';
+        });
+
+        // Add event listener to the button
+        rollButton.addEventListener('click', rollDice);
+
+    </script>
+</body>
+</html>
